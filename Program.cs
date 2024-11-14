@@ -11,7 +11,7 @@ namespace HASM
             string code = File.ReadAllText("C:\\Users\\alexm\\source\\repos\\HydrixAssembler\\test.hsm");
 
             HAssembler assembler = new HAssembler(code);
-            Console.WriteLine(assembler.Assemble());
+            File.WriteAllText("C:\\Users\\alexm\\source\\repos\\HydrixAssembler\\test.asm", assembler.Assemble());
         }
     }
 
@@ -253,6 +253,12 @@ namespace HASM
                         string arguments = token.Substring(token.IndexOf("(") + 1, token.Length - token.IndexOf("(") - 2);
                         //split the arguments
                         string[] args = arguments.Split(", ");
+                        //check if no args
+                        if (args.Length == 0)
+                        {
+                            output.AppendLine($"call {functionName}");
+                            break;
+                        }
                         //reverse the arguments
                         Array.Reverse(args);
                         //push each argument
