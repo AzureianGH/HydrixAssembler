@@ -8,33 +8,7 @@ namespace HASM
     {
         static void Main(string[] args)
         {
-            string code = @"
-$define SYS_EXIT 60
-$define SYS_WRITE 1
-$define STDOUT 1
-
-$global _start;
-
-$section text {
-    label _start {
-        move rax <- SYS_WRITE;
-        move rdi <- STDOUT;
-        move rsi <- message;
-        move rdx <- message_length;
-        move rax <- &SYS_EXIT;
-        move rdi <- 0;
-    }
-}
-
-$section data {
-    label message {
-        db 'Hello, World!', 0;
-    }
-    label message_length {
-        dq $ - message;
-    }
-}
-";
+            string code = File.ReadAllText("C:\\Users\\alexm\\source\\repos\\HydrixAssembler\\test.hsm");
 
             HAssembler assembler = new HAssembler(code);
             Console.WriteLine(assembler.Assemble());
@@ -61,6 +35,11 @@ $section data {
         public string Peek()
         {
             return position < tokens.Length ? tokens[position] : null;
+        }
+
+        public string Peek(int count)
+        {
+            return position + count < tokens.Length ? tokens[position + count] : null;
         }
 
         public bool HasMoreTokens()
@@ -148,14 +127,78 @@ $section data {
                 else if (token == "label")
                 {
                     string labelName = tokenizer.GetNext();
-                    output.AppendLine($"{labelName}:");
-
+                    output.Append($"{labelName}");
+                    //check if next token is equ, if not, add :
+                    if (tokenizer.Peek() == "{")
+                    {
+                        //get token after that by peeking 2 ahead
+                        string forward = tokenizer.Peek(1);
+                        if (forward == "equ")
+                        {
+                            output.Append(" ");
+                        }
+                        else
+                        {
+                            output.AppendLine(": ");
+                        }
+                    }
                     // Parse the block associated with the label
                     string labelBlock = tokenizer.GetBlock();
                     output.Append(new HAssembler(labelBlock, indentationLevel + 1).Assemble());
                 }
+                else if (token == "$pstk") // Prepare Stack
+                {
+                    output.AppendLine("push rbp");
+                    output.AppendLine("mov rbp, rsp");
+                }
+                else if (token == "$fstk") // Finalize Stack
+                {
+                    output.AppendLine("mov rsp, rbp");
+                    output.AppendLine("pop rbp");
+                }
+                else if (token == "$return")
+                {
+                    output.AppendLine("ret");
+                }
+            
+                else if (token == "/*" || token.StartsWith("/*"))
+                {
+                    // Delete the comment
+                    while (tokenizer.HasMoreTokens() && !tokenizer.GetNext().EndsWith("*/")) ;
+                }
+                else if (token.StartsWith("'") || token.StartsWith("\""))
+                {
+                    //loop through until the end of the string and put into output
+                    string str = token;
+                    if (str.StartsWith("'"))
+                    {
+                        // Loop until the end of the string and put into output
+
+                        //the ' might not be at the end of the token, since it could be next to a comma
+                        if (str.EndsWith("'"))
+                        {
+                            output.Append($"'{str.Substring(1, str.Length - 2)}' ");
+                        }
+                        else
+                        {
+                            //get the next token
+                            string next = tokenizer.GetNext();
+                            //check if the next token ends with a ', if so, add it to the string
+                            if (next.EndsWith("'"))
+                            {
+                                output.Append($"'{str.Substring(1)} {next.Substring(0, next.Length - 1)}' ");
+                            }
+                            else
+                            {
+                                output.Append($"'{str.Substring(1)} {next} ");
+                            }
+                        }
+                    }
+                }
                 else
                 {
+                    //check if its a string ' or "
+                    
                     //check if a token contains a define
                     if (PreProcessingDefines.ContainsKey(token))
                     {
@@ -190,6 +233,47 @@ $section data {
                             output.AppendLine($"mov {destination}, {source}");
                         }
                     }
+                    else if (token.EndsWith(")") && token.Contains("("))
+                    {
+                        // example: labelname(rax, rdi, rsi, rdx, 0x0, &variable)
+                        /*
+                         That becomes
+                         push [variable]
+                         push 0
+                         push rdx
+                         push rsi
+                         push rdi
+                         push rax
+                         call labelname
+                         */
+
+                        //get the function name
+                        string functionName = token.Substring(0, token.IndexOf("("));
+                        //get the arguments
+                        string arguments = token.Substring(token.IndexOf("(") + 1, token.Length - token.IndexOf("(") - 2);
+                        //split the arguments
+                        string[] args = arguments.Split(", ");
+                        //reverse the arguments
+                        Array.Reverse(args);
+                        //push each argument
+                        foreach (var arg in args)
+                        {
+                            if (arg.StartsWith("&"))
+                            {
+                                output.AppendLine($"push [{arg.Substring(1)}]");
+                            }
+                            else if (arg.StartsWith("0x") || arg.StartsWith("0b") || arg.StartsWith("0o") || long.TryParse(arg, out long _))
+                            {
+                                output.AppendLine($"push {NumberHelper.GetNumber(arg)}");
+                            }
+                            else
+                            {
+                                output.AppendLine($"push {arg}");
+                            }
+                        }
+                        //call the function
+                        output.AppendLine($"call {functionName}");
+                    }
                     // else check if theres an arrow, if so, just put a comma
                     else
                     {
@@ -211,7 +295,7 @@ $section data {
                             //if token ends with ;, make a new line
                             if (token.EndsWith(";"))
                             {
-                                output.AppendLine(token);
+                                output.AppendLine("");
                             }
                             else
                             {

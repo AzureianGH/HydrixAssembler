@@ -1,0 +1,27 @@
+﻿$define SYS_EXIT 60
+$define SYS_WRITE 1
+$define STDOUT 1
+
+$global _start;
+
+$section text {
+    label _start {
+        move rax <- SYS_WRITE; /* syscall number for write */
+        move rdi <- STDOUT;
+        move rsi <- message;
+        move rdx <- message_length; /* length of the message */
+        syscall;
+        move rax <- SYS_EXIT;
+        move rdi <- 0;
+        syscall;
+    }
+}
+
+$section data {
+    label message {
+        db 'Hello, World!', 0; /* null-terminated string
+    }
+    label message_length {
+        equ $ - message; /* length of the message */
+    }
+}
