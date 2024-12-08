@@ -6,7 +6,7 @@ $global _start;
 
 $section text {
     label _start {
-        _random_function() /* call the function */
+        call _random_function ;
         move rdi <- STDOUT;
         move rsi <- message;
         move rdx <- message_length; /* length of the message */
@@ -20,7 +20,7 @@ $section text {
     {
         $pstk /* prepare stack */
         move rax <- SYS_WRITE;
-        $fstk /* restore stack */
+        $fstk /* restore stack */ 
     }
 }
 

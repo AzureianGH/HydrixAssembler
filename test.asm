@@ -1,8 +1,7 @@
 global _start;
 section .text
 _start: 
-push 
-call _random_function
+call _random_function 
 mov rdi, 1
 mov rsi, message;
 mov rdx, message_length;
